@@ -1,0 +1,165 @@
+CREATE OR REPLACE PROCEDURE `lakehouse-btcw.data_warehouse.sch_fact_instrument_price`()
+begin 
+
+declare msg string ;
+declare start_at TIMESTAMP default CURRENT_TIMESTAMP();
+declare end_at TIMESTAMP;
+declare exits date ;
+
+BEGIN 
+
+declare  i int64 default 0;
+declare  d int64 default 1;
+DECLARE last_date date;
+DECLARE is_quartal INT64;
+
+set exits =   (select max(position_date) from `lakehouse-btcw.data_lakehouse.pi_daily_portfolio_nab` ); 
+
+
+    MERGE INTO `lakehouse-btcw.data_warehouse.fact_instrument_price` Target
+            USING (
+SELECT
+				DISTINCT S.id AS id,
+				S.id_pi_instrument_price AS id_pi_instrument_price_new,
+				S.id_instrument AS id_instrument_new,
+				S.id_market AS id_market_new,
+				S.market_date AS market_date_new,
+				S.market_price AS market_price_new,
+				S.adjustment AS adjustment_new,
+				S.market_price_1 AS market_price_1_new,
+				S.market_price_2 AS market_price_2_new,
+				S.market_price_3 AS market_price_3_new,
+				S.market_price_4 AS market_price_4_new,
+				S.market_price_5 AS market_price_5_new,
+				S.market_update_id AS market_update_id_new,
+				S.pc AS pc_new,
+				S.pi AS pi_new,
+				S.market_name AS market_name_new,
+				S.instrument_short_name AS instrument_short_name_new,
+				S.last_update AS last_update_new,
+				T.id_pi_instrument_price AS id_pi_instrument_price_old,
+				T.id_instrument AS id_instrument_old,
+				T.id_market AS id_market_old,
+				T.market_date AS market_date_old,
+				T.market_price AS market_price_old,
+				T.adjustment AS adjustment_old,
+				T.market_price_1 AS market_price_1_old,
+				T.market_price_2 AS market_price_2_old,
+				T.market_price_3 AS market_price_3_old,
+				T.market_price_4 AS market_price_4_old,
+				T.market_price_5 AS market_price_5_old,
+				T.market_update_id AS market_update_id_old,
+				T.pc AS pc_old,
+				T.pi AS pi_old,
+				T.market_name AS market_name_old,
+				T.instrument_short_name AS instrument_short_name_old,
+				T.last_update AS last_update_old,
+					CASE
+						WHEN (	T.id_pi_instrument_price IS NULL) THEN 'INSERT'
+						WHEN (	T.id_pi_instrument_price <>	S.id_pi_instrument_price	)
+						or(	T.id_instrument <>	S.id_instrument	)
+						or(	T.id_market <>	S.id_market	)
+						or(	T.market_date <>	S.market_date	)
+						or(	T.market_price <>	S.market_price	)
+						or(	T.adjustment <>	S.adjustment	)
+						or(	T.market_price_1 <>	S.market_price_1	)
+						or(	T.market_price_2 <>	S.market_price_2	)
+						or(	T.market_price_3 <>	S.market_price_3	)
+						or(	T.market_price_4 <>	S.market_price_4	)
+						or(	T.market_price_5 <>	S.market_price_5	)
+						or(	T.market_update_id <>	S.market_update_id	)
+						or(	T.pc <>	S.pc	)
+						or(	T.pi <>	S.pi	)
+						or(	T.market_name <>	S.market_name	)
+						or(	T.instrument_short_name <>	S.instrument_short_name	)
+						or(	T.last_update <>S.last_update	)
+
+						THEN 'UPDATE'
+					ELSE
+					'KEEP'
+				END
+				AS MERGEACTION
+				FROM (
+				SELECT
+					UPPER(GENERATE_UUID()) AS id,
+					a.id AS id_pi_instrument_price,
+					a.id_instrument AS id_instrument,
+					id_market,
+					market_date,
+					market_price,
+					adjustment,
+					market_price_1,
+					market_price_2,
+					market_price_3,
+					market_price_4,
+					market_price_5,
+					market_update_id,
+					pc,
+					pi,
+					b.name AS market_name,
+					c.short_name AS instrument_short_name,
+					a.last_update
+				FROM
+					`lakehouse-btcw.data_lakehouse.pi_instrument_price` a
+				LEFT JOIN
+					`lakehouse-btcw.data_lakehouse.pi_market` b
+				ON
+					b.id = a.id_market
+				LEFT JOIN
+					`lakehouse-btcw.data_lakehouse.pi_instrument` c
+				ON
+					c.id_instrument = a.id_instrument ) S
+				FULL JOIN
+				`lakehouse-btcw.data_warehouse.fact_instrument_price`T
+				ON
+				T.id_pi_instrument_price = S.id_pi_instrument_price)SOURCE
+				ON  SOURCE.id_pi_instrument_price_new = Target.id_pi_instrument_price
+
+					WHEN MATCHED   AND SOURCE.MERGEACTION='UPDATE' 
+							THEN  UPDATE SET  
+									market_date = Source.market_date_new ,
+									market_price = Source.market_price_new,
+									adjustment = Source.adjustment_new,
+									market_price_1 = Source.market_price_1_new,
+									market_price_2 = Source.market_price_2_new,
+									market_price_3 = Source.market_price_3_new,
+									market_price_4 = Source.market_price_4_new,
+									market_price_5 = Source.market_price_5_new,
+									market_update_id = Source.market_update_id_new,
+									pc = Source.pc_new,
+									pi = Source.pi_new,
+									market_name = Source.market_name_new,
+									instrument_short_name = Source.instrument_short_name_new, 
+									last_update = Source.last_update_new
+							WHEN NOT MATCHED  THEN 
+								INSERT
+								(id,
+									id_pi_instrument_price,
+									id_instrument,
+									id_market,
+									market_date,
+									market_price,
+									adjustment,
+									market_price_1,
+									market_price_2,
+									market_price_3,
+									market_price_4,
+									market_price_5,
+									market_update_id,
+									pc,
+									pi,
+									market_name,
+									instrument_short_name,
+									last_update)
+								VALUES
+								(Source.id,Source.id_pi_instrument_price_new,Source.id_instrument_new,Source.id_market_new,Source.market_date_new,Source.market_price_new,Source.adjustment_new,Source.market_price_1_new,Source.market_price_2_new,Source.market_price_3_new,Source.market_price_4_new,Source.market_price_5_new,Source.market_update_id_new,Source.pc_new,Source.pi_new,Source.market_name_new,Source.instrument_short_name_new,Source.last_update_new) ;
+
+ set end_at = (select CURRENT_TIMESTAMP());
+call  `lakehouse-btcw.data_lakehouse.logging_data_fusion_sch`('sch_fact_instrument_price','sch',start_at,end_at, 'sukses', 'fact_instrument_price',msg,exits);
+
+ EXCEPTION WHEN ERROR THEN
+ call  `lakehouse-btcw.data_lakehouse.logging_data_fusion_sch`('sch_fact_instrument_price','sch',start_at,end_at, 'error', 'fact_instrument_price', @@error.message,exits );
+
+
+end;
+END;
